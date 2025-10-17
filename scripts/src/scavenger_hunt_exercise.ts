@@ -13,6 +13,7 @@ import keyPairJson from "../keypair.json";
  */
 const { secretKey } = decodeSuiPrivateKey(keyPairJson.privateKey);
 const keypair = Ed25519Keypair.fromSecretKey(secretKey);
+const suiAddress = keypair.getPublicKey().toSuiAddress();
 
 const PACKAGE_ID = `0x9603a31f4b3f32843b819b8ed85a5dd3929bf1919c6693465ad7468f9788ef39`;
 const VAULT_ID = `0x8d85d37761d2a4e391c1b547c033eb0e22eb5b825820cbcc0c386b8ecb22be33`;
@@ -39,11 +40,17 @@ const main = async () => {
    * Create a new Transaction instance from the @mysten/sui/transactions module.
    */
 
+  const tx = new Transaction();
+
   /**
    * Task 2:
    *
    * Create a new key using the `key::new` function.
    */
+
+  const [key] = tx.moveCall({
+    target: `${PACKAGE_ID}::key::new`,
+  });
 
   /**
    * Task 3:
@@ -51,12 +58,22 @@ const main = async () => {
    * Set the key code correctly using the `key::set_code` function.
    */
 
+  tx.moveCall({
+    target: `${PACKAGE_ID}::key::set_code`,
+    arguments: [key, tx.pure.u64(745223)],
+  });
+
   /**
    * Task 4:
    *
    * Use the key to withdraw the `SUI` coin from the vault using the `vault::withdraw` function.
    */
   
+  const [suiCoin] = tx.moveCall({
+    target: `${PACKAGE_ID}::vault::withdraw`,
+    typeArguments: ["0x2::sui::SUI"],
+    arguments: [tx.object(VAULT_ID), key],
+  });
 
   /**
    * Task 5:
@@ -64,6 +81,7 @@ const main = async () => {
    * Transfer the `SUI` coin to your account.
    */
 
+  tx.transferObjects([suiCoin], tx.pure.address(suiAddress));
 
   /**
    * Task 6:
@@ -76,6 +94,8 @@ const main = async () => {
    * - Observing transaction results: https://sdk.mystenlabs.com/typescript/transaction-building/basics#observing-the-results-of-a-transaction
    */
 
+  const result = await suiClient.signAndExecuteTransaction({transaction: tx, signer: keypair});
+  console.log(result);
 
   /**
    * Task 7: Run the script with the command below and ensure it works!
